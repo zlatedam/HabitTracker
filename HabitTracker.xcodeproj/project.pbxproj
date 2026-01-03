@@ -68,6 +68,13 @@
 			);
 			target = 6C50DDD02F0945D200EEEE6A /* HabitWidgetExtension */;
 		};
+		6C50DDF02F09685400EEEE6A /* Exceptions for "HabitTracker" folder in "HabitWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Habit.swift,
+			);
+			target = 6C50DDD02F0945D200EEEE6A /* HabitWidgetExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -81,6 +88,9 @@
 		};
 		6C76FF5D2F0897F200C3CFF4 /* HabitTracker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6C50DDF02F09685400EEEE6A /* Exceptions for "HabitTracker" folder in "HabitWidgetExtension" target */,
+			);
 			path = HabitTracker;
 			sourceTree = "<group>";
 		};

@@ -7,12 +7,12 @@ struct Provider: TimelineProvider {
         SimpleEntry(date: Date(), habits: [])
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
+    func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> Void) {
         let entry = SimpleEntry(date: Date(), habits: [])
         completion(entry)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
         let habits = fetchHabits()
         let currentDate = Date()
         let entry = SimpleEntry(date: currentDate, habits: habits)
@@ -27,7 +27,10 @@ struct Provider: TimelineProvider {
         do {
             let container = try ModelContainer(for: Habit.self)
             let descriptor = FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)])
-            let habits = try container.mainContext.fetch(descriptor)
+            
+            // Create a new ModelContext instead of using mainContext
+            let context = ModelContext(container)
+            let habits = try context.fetch(descriptor)
             return habits
         } catch {
             print("Failed to fetch habits: \(error)")
@@ -41,7 +44,7 @@ struct SimpleEntry: TimelineEntry {
     let habits: [Habit]
 }
 
-struct HabitWidgetEntryView : View {
+struct HabitWidgetEntryView: View {
     var entry: Provider.Entry
     @Environment(\.widgetFamily) var family
     
