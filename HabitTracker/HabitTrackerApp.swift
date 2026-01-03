@@ -1,10 +1,3 @@
-//
-//  HabitTrackerApp.swift
-//  HabitTracker
-//
-//  Created by Zlatko Damcevski on 3/1/2026.
-//
-
 import SwiftUI
 import SwiftData
 

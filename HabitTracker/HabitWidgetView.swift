@@ -1,50 +1,53 @@
 import SwiftUI
+import SwiftData
 
 struct HabitWidgetView: View {
-    let habit: Habit
-    let currentDayOfYear: Int
-    let onToggleDay: (Int) -> Void
-    let onDelete: () -> Void
+    @Bindable var habit: Habit
+    let currentDay: Int
     
-    let columns = 10  // Changed from rows
+    @State private var isZoomed = false
+    @State private var showingDeleteAlert = false
+    @State private var isToggling = false
+    @Environment(\.modelContext) private var modelContext
+    
+    let dotsPerRow = 73  // Days per row
     let daysInYear = 365
     
-    var rows: Int {  // Changed from columns
-        Int(ceil(Double(daysInYear) / Double(columns)))
-    }
-    
-    var isTodayCompleted: Bool {
-        habit.isCompleted(day: currentDayOfYear)
+    var totalRows: Int {
+        Int(ceil(Double(daysInYear) / Double(dotsPerRow)))
     }
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 12) {
-                // Dot grid - now vertical orientation
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(0..<rows, id: \.self) { row in
-                        HStack(spacing: 2) {
-                            ForEach(0..<columns, id: \.self) { col in
-                                let dayNumber = col + (row * columns) + 1
-                                if dayNumber <= daysInYear {
-                                    DotButton(
-                                        dayNumber: dayNumber,
-                                        habit: habit,
-                                        currentDay: currentDayOfYear,
-                                        onToggle: onToggleDay
-                                    )
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: isZoomed ? 2 : 1) {
+                            ForEach(0..<totalRows, id: \.self) { row in
+                                HStack(spacing: isZoomed ? 2 : 1) {
+                                    ForEach(0..<dotsPerRow, id: \.self) { col in
+                                        let dayNumber = (row * dotsPerRow) + col + 1
+                                        if dayNumber <= daysInYear {
+                                            makeDot(for: dayNumber)
+                                                .id(dayNumber)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                    .frame(height: isZoomed ? 60 : 40)
+                    .clipped()
+                    .onAppear {
+                        proxy.scrollTo(1, anchor: .leading)
+                    }
                 }
                 
-                // Quick action button
                 Button {
-                    onToggleDay(currentDayOfYear)
+                    toggleDay(currentDay)
                 } label: {
                     HStack(spacing: 6) {
-                        if isTodayCompleted {
+                        if habit.isCompleted(day: currentDay) {
                             Image(systemName: "checkmark.circle.fill")
                             Text("Today Complete")
                         } else {
@@ -55,81 +58,114 @@ struct HabitWidgetView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(isTodayCompleted ? Color.white.opacity(0.2) : Color.white.opacity(0.3))
+                    .background(habit.isCompleted(day: currentDay) ? Color.white.opacity(0.2) : Color.white.opacity(0.3))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .buttonStyle(.plain)
                 
-                // Stats text
                 HStack(alignment: .bottom) {
                     Text(habit.name.uppercased())
-                        .font(.system(.subheadline, design: .monospaced, weight: .medium))
+                        .font(.system(.caption, design: .monospaced, weight: .medium))
                         .foregroundStyle(.white)
+                        .lineLimit(1)
                     
                     Spacer()
                     
                     Text("\(habit.completedCount) days")
-                        .font(.system(.caption, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.6))
                 }
             }
-            .padding(20)
+            .padding(14)
             .background(habit.color)
             .clipShape(RoundedRectangle(cornerRadius: 24))
             
-            // Delete button
-            Button(action: onDelete) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 24, height: 24)
-                    .background(.white.opacity(0.2))
-                    .clipShape(Circle())
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(.spring(duration: 0.3)) {
+                        isZoomed.toggle()
+                    }
+                } label: {
+                    Image(systemName: isZoomed ? "minus.magnifyingglass" : "plus.magnifyingglass")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(.white.opacity(0.2))
+                        .clipShape(Circle())
+                }
+                
+                Button {
+                    showingDeleteAlert = true
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(.white.opacity(0.2))
+                        .clipShape(Circle())
+                }
+                .alert("Delete Habit?", isPresented: $showingDeleteAlert) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) {
+                        modelContext.delete(habit)
+                    }
+                } message: {
+                    Text("Are you sure you want to delete '\(habit.name)'? This action cannot be undone.")
+                }
             }
-            .padding(12)
+            .padding(10)
         }
     }
-}
-
-struct DotButton: View {
-    let dayNumber: Int
-    let habit: Habit
-    let currentDay: Int
-    let onToggle: (Int) -> Void
     
-    var isCompleted: Bool { habit.isCompleted(day: dayNumber) }
-    var isPast: Bool { dayNumber <= currentDay }
-    var isFuture: Bool { dayNumber > currentDay }
-    var isToday: Bool { dayNumber == currentDay }
-    
-    var body: some View {
+    @ViewBuilder
+    func makeDot(for dayNumber: Int) -> some View {
+        let isCompleted = habit.isCompleted(day: dayNumber)
+        let isPast = dayNumber <= currentDay
+        let isToday = dayNumber == currentDay
+        
         Button {
             if isPast {
-                onToggle(dayNumber)
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
+                toggleDay(dayNumber)
             }
         } label: {
             Circle()
-                .fill(dotColor)
-                .frame(width: 4, height: 4)
+                .fill(dotColor(isCompleted: isCompleted, isPast: isPast))
+                .frame(width: isZoomed ? 4 : 2, height: isZoomed ? 4 : 2)
                 .overlay {
                     if isToday && !isCompleted {
                         Circle()
-                            .strokeBorder(.white.opacity(0.5), lineWidth: 0.5)
-                            .frame(width: 6, height: 6)
+                            .strokeBorder(.white.opacity(0.6), lineWidth: 1)
+                            .frame(width: isZoomed ? 8 : 5, height: isZoomed ? 8 : 5)
                     }
                 }
+                .frame(width: isZoomed ? 12 : 8, height: isZoomed ? 12 : 8)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(width: 12, height: 12)
-        .contentShape(Rectangle())
-        .disabled(isFuture)
+        .disabled(!isPast)
     }
     
-    var dotColor: Color {
+    func toggleDay(_ day: Int) {
+        guard !isToggling else { return }
+        isToggling = true
+        
+        withAnimation(.spring(duration: 0.2)) {
+            habit.toggleDay(day)
+        }
+        try? modelContext.save()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            isToggling = false
+        }
+    }
+    
+    func dotColor(isCompleted: Bool, isPast: Bool) -> Color {
         if isCompleted {
             return .white.opacity(0.9)
-        } else if isFuture {
+        } else if !isPast {
             return .white.opacity(0.15)
         } else {
+            return .white.opacity(0.3)
+        }
+    }
+}

@@ -4,20 +4,45 @@ import SwiftData
 struct ContentView: View {
     @Query(sort: \Habit.createdAt) var habits: [Habit]
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) var colorScheme
     @State private var showingAddSheet = false
     
     var currentDayOfYear: Int {
-        Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 1
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone(identifier: "Australia/Sydney")!
+        let now = Date()
+        let day = calendar.ordinality(of: .day, in: .year, for: now) ?? 1
+        print("🕐 Current date: \(now)")
+        print("🕐 Current day: \(day)")
+        print("🕐 Timezone: \(calendar.timeZone.identifier)")
+        return day
     }
     
     var daysLeftInYear: Int {
         365 - currentDayOfYear
     }
     
+    var backgroundGradient: some View {
+        Group {
+            if colorScheme == .dark {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.176, green: 0.176, blue: 0.227),
+                        Color(red: 0.122, green: 0.122, blue: 0.180)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                Color(red: 0.976, green: 0.973, blue: 0.969)
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
+                backgroundGradient
                     .ignoresSafeArea()
                 
                 if habits.isEmpty {
@@ -26,21 +51,7 @@ struct ContentView: View {
                     ScrollView {
                         VStack(spacing: 16) {
                             ForEach(habits) { habit in
-                                HabitWidgetView(
-                                    habit: habit,
-                                    currentDayOfYear: currentDayOfYear,
-                                    onToggleDay: { day in
-                                        withAnimation(.spring(duration: 0.3)) {
-                                            habit.toggleDay(day)
-                                        }
-                                        try? modelContext.save()
-                                    },
-                                    onDelete: {
-                                        withAnimation {
-                                            modelContext.delete(habit)
-                                        }
-                                    }
-                                )
+                                HabitWidgetView(habit: habit, currentDay: currentDayOfYear)
                             }
                         }
                         .padding()
@@ -81,5 +92,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Habit.self)
+        .modelContainer(for: Habit.self, inMemory: true)
 }
