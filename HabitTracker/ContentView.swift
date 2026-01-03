@@ -1,66 +1,85 @@
-//
-//  ContentView.swift
-//  HabitTracker
-//
-//  Created by Zlatko Damcevski on 3/1/2026.
-//
-
 import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    @Query(sort: \Habit.createdAt) var habits: [Habit]
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
+    @State private var showingAddSheet = false
+    
+    var currentDayOfYear: Int {
+        Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 1
+    }
+    
+    var daysLeftInYear: Int {
+        365 - currentDayOfYear
+    }
+    
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        NavigationStack {
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                
+                if habits.isEmpty {
+                    emptyState
+                } else {
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            ForEach(habits) { habit in
+                                HabitWidgetView(
+                                    habit: habit,
+                                    currentDayOfYear: currentDayOfYear,
+                                    onToggleDay: { day in
+                                        withAnimation(.spring(duration: 0.3)) {
+                                            habit.toggleDay(day)
+                                        }
+                                        try? modelContext.save()
+                                    },
+                                    onDelete: {
+                                        withAnimation {
+                                            modelContext.delete(habit)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        .padding()
                     }
                 }
-                .onDelete(perform: deleteItems)
             }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
+            .navigationTitle("Habits")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingAddSheet = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
                     }
                 }
             }
-        } detail: {
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            .sheet(isPresented: $showingAddSheet) {
+                AddHabitView()
             }
         }
+    }
+    
+    var emptyState: some View {
+        VStack(spacing: 20) {
+            Text("📊")
+                .font(.system(size: 80))
+            Text("No Habits Yet")
+                .font(.title2)
+                .fontWeight(.bold)
+            Text("Tap + to create your first habit tracker")
+                .foregroundStyle(.secondary)
+        }
+        .padding()
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: Habit.self)
 }
