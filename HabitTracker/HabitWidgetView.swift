@@ -8,6 +8,7 @@ struct HabitWidgetView: View {
     @State private var isZoomed = false
     @State private var showingDeleteAlert = false
     @State private var isToggling = false
+    @State private var showMilestoneSheet = false
     @Environment(\.modelContext) private var modelContext
     
     let dotsPerRow = 73  // Days per row
@@ -62,6 +63,90 @@ struct HabitWidgetView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 
+                // Streaks & Milestones Section
+                VStack(spacing: 6) {
+                    // Streaks Row
+                    HStack {
+                        HStack(spacing: 4) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 10))
+                            Text("\(habit.currentStreak)")
+                                .font(.system(.caption, design: .monospaced, weight: .bold))
+                            Text("current")
+                                .font(.system(.caption2, design: .monospaced))
+                                .opacity(0.7)
+                        }
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 10))
+                            Text("\(habit.longestStreak)")
+                                .font(.system(.caption, design: .monospaced, weight: .bold))
+                            Text("best")
+                                .font(.system(.caption2, design: .monospaced))
+                                .opacity(0.7)
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    
+                    // Next Milestone
+                    if let next = habit.nextMilestone, let daysLeft = habit.daysUntilNextMilestone {
+                        Button {
+                            showMilestoneSheet = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(next.emoji)
+                                    .font(.system(size: 12))
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Text("\(daysLeft) to \(next.title)")
+                                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 8, weight: .bold))
+                                    }
+                                    
+                                    GeometryReader { geo in
+                                        ZStack(alignment: .leading) {
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(.white.opacity(0.2))
+                                            
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(.white.opacity(0.8))
+                                                .frame(width: geo.size.width * habit.progressToNextMilestone)
+                                        }
+                                    }
+                                    .frame(height: 3)
+                                }
+                                
+                                Spacer()
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 8)
+                            .background(.white.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        // All milestones achieved!
+                        HStack(spacing: 6) {
+                            Text("👑")
+                                .font(.system(size: 12))
+                            Text("All milestones achieved!")
+                                .font(.system(.caption2, design: .monospaced, weight: .medium))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 8)
+                        .background(.white.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                
                 HStack(alignment: .bottom) {
                     Text(habit.name.uppercased())
                         .font(.system(.caption, design: .monospaced, weight: .medium))
@@ -113,6 +198,9 @@ struct HabitWidgetView: View {
                 }
             }
             .padding(10)
+        }
+        .sheet(isPresented: $showMilestoneSheet) {
+            MilestoneDetailView(habit: habit)
         }
     }
     
@@ -166,6 +254,77 @@ struct HabitWidgetView: View {
             return .white.opacity(0.15)
         } else {
             return .white.opacity(0.3)
+        }
+    }
+}
+
+// MARK: - Milestone Detail View
+struct MilestoneDetailView: View {
+    @Bindable var habit: Habit
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Text(habit.name)
+                            .font(.title2.bold())
+                        Text("\(habit.completedCount) days completed")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top)
+                    
+                    // All Milestones
+                    VStack(spacing: 12) {
+                        ForEach(Habit.milestones, id: \.days) { milestone in
+                            let achieved = habit.completedCount >= milestone.days
+                            
+                            HStack(spacing: 16) {
+                                Text(milestone.emoji)
+                                    .font(.system(size: 32))
+                                    .frame(width: 50)
+                                    .opacity(achieved ? 1 : 0.3)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(milestone.title)
+                                        .font(.headline)
+                                    Text("\(milestone.days) days")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                if achieved {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                        .font(.title2)
+                                } else {
+                                    Text("\(milestone.days - habit.completedCount) to go")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding()
+                            .background(achieved ? habit.color.opacity(0.1) : Color.gray.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .navigationTitle("Milestones")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }

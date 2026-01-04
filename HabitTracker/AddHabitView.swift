@@ -8,6 +8,7 @@ struct AddHabitView: View {
     @State private var name = ""
     @State private var selectedColor = "#8BA888"
     
+    // Adapting coulor theme from claude
     let colors = [
         "#8BA888", "#A8B5C8", "#C8B5A5",
         "#B8A8C8", "#C8A8A8", "#A8C8B8",
